@@ -58,8 +58,8 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block, vis=False,
                cells_per_block=(cell_per_block, cell_per_block),
                transform_sqrt=True, visualise=vis, feature_vector=feature_vec)
 
-def extract_features_from_images(paths, cspace='RGB', spatial_size=(32, 32),
-                     hist_bins=32, hist_range=(0, 256),
+def extract_features_from_images(paths, cspace='RGB', spatial_size=None,
+                     hist_bins=0, hist_range=(0, 256),
                      hog_orient=9, hog_pix_per_cell = 8, hog_cell_per_block=2, hog_channel=0):
     '''
     Extract features from a list of image paths
@@ -74,13 +74,17 @@ def extract_features_from_images(paths, cspace='RGB', spatial_size=(32, 32),
     return features
 
 def extract_features(img, spatial_size=(32, 32),
-                     hist_bins=32, hist_range=(0, 256),
+                     hist_bins=0, hist_range=(0, 256),
                      hog_orient=9, hog_pix_per_cell = 8, hog_cell_per_block=2, hog_channel=0):
     '''
     Extract features from a single image
     '''
-    spatial_features = bin_spatial(img, spatial_size)
-    color_features = color_hist(img, hist_bins, hist_range)
+    spatial_features = []
+    if spatial_size is not None:
+        spatial_features = bin_spatial(img, spatial_size)
+    color_features = []
+    if hist_bins > 0:
+        color_features = color_hist(img, hist_bins, hist_range)
     if hog_channel == 'ALL':
         hog_features = []
         for channel in range(img.shape[2]):
@@ -89,7 +93,7 @@ def extract_features(img, spatial_size=(32, 32),
                                 vis=False, feature_vec=True))
         hog_features = np.ravel(hog_features)        
     elif hog_channel == 'NONE':
-        pass
+        hog_features = []
     else:
         hog_features = get_hog_features(img[:,:,hog_channel],
                                         hog_orient, hog_pix_per_cell,
