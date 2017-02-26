@@ -7,6 +7,51 @@ This module contains various functions written as part of the lesson exercises
 which may be helpful here.
 '''
 
+def rgb(src, src_cspace):
+    '''
+    Convert a 32 bit float [0,1] image to a uint8 image in the rgb colorspace
+    '''
+    if src_cspace == 'HSV':
+        img = cv2.cvtColor(img, cv2.COLOR_HSV2RGB)
+    elif src_cspace == 'HSL':
+        img = cv2.cvtColor(img, cv2.COLOR_HSL2RGB)
+    elif cspace == 'RGB':
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2RGB)
+    elif src_cspace == 'LUV':
+        img = cv2.cvtColor(img, cv2.COLOR_LUV2RGB)
+    elif src_cspace == 'YUV':
+        img = cv2.cvtColor(img, cv2.COLOR_YUV2RGB)
+    elif cspace == 'YCrCb':
+        img = cv2.cvtColor(img, cv2.COLOR_YCrCb2RGB)
+    else:
+        raise Exception("unknown colorspace " + cspace)
+    if img.dtype != np.uint8:
+        img = (img * 255).astype(np.uint8)
+    return img
+
+def write_image(path, src, src_cspace):
+    '''
+    Write an image to a file. Input can be 32-bit float [0,1] or uint8
+    '''
+    if src_cspace == 'HSV':
+        img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+    elif src_cspace == 'HSL':
+        img = cv2.cvtColor(img, cv2.COLOR_HSL2BGR)
+    elif cspace == 'RGB':
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    elif src_cspace == 'LUV':
+        img = cv2.cvtColor(img, cv2.COLOR_LUV2RGB)
+    elif src_cspace == 'YUV':
+        img = cv2.cvtColor(img, cv2.COLOR_YUV2BGR)
+    elif src_cspace == 'YCrCb':
+        img = cv2.cvtColor(img, cv2.COLOR_YCrCb2BGR)
+    else:
+        raise Exception("unknown colorspace " + cspace)
+    if img.dtype != np.uint8:
+        img = (img * 255).astype(np.uint8)
+    cv2.imwrite(path, img)
+
+
 def read_image(path, cspace='RGB'):
     '''
     Load image and convert to 32-bit float [0,1] in the requested colorspace
@@ -89,9 +134,9 @@ def extract_features(img, spatial_size=(32, 32),
         hog_features = []
         for channel in range(img.shape[2]):
             hog_features.append(get_hog_features(img[:,:,channel],
-                                hog_orient, hog_pix_per_cell, hog_cell_per_block, 
+                                hog_orient, hog_pix_per_cell, hog_cell_per_block,
                                 vis=False, feature_vec=True))
-        hog_features = np.ravel(hog_features)        
+        hog_features = np.ravel(hog_features)
     elif hog_channel == 'NONE':
         hog_features = []
     else:
@@ -102,7 +147,7 @@ def extract_features(img, spatial_size=(32, 32),
     features = np.concatenate((spatial_features, color_features, hog_features))
     return features
 
-def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None], 
+def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None],
                     xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
     # If x and/or y start/stop positions not defined, set to image size
     if x_start_stop[0] is None:
@@ -113,14 +158,14 @@ def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None],
         y_start_stop[0] = 0
     if y_start_stop[1] is None:
         y_start_stop[1] = img.shape[0]
-    
+
     x_step = int(xy_window[0] * (1 - xy_overlap[0]))
     x_start = x_start_stop[0]
     x_stop = x_start_stop[1] - xy_window[0] + 1
     y_step = int(xy_window[1] * (1 - xy_overlap[1]))
     y_start = y_start_stop[0]
     y_stop = y_start_stop[1] - xy_window[1] + 1
-    
+
     window_list = []
     for x in range(x_start, x_stop, x_step):
         for y in range(y_start, y_stop, y_step):
