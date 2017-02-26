@@ -1,4 +1,6 @@
+import cv2
 import numpy as np
+from skimage.feature import hog
 
 '''
 This module contains various functions written as part of the lesson exercises
@@ -17,9 +19,11 @@ def read_image(path, cspace='RGB'):
     elif cspace == 'RGB':
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     elif cspace == 'LUV':
-        img = cv2.cvtColor(image, cv2.COLOR_BGR2LUV)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
     elif cspace == 'YUV':
-        img = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+    elif cspace == 'YCrCb':
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
     else:
         raise Exception("unknown colorspace " + cspace)
     return img
@@ -62,8 +66,8 @@ def extract_features_from_images(paths, cspace='RGB', spatial_size=(32, 32),
     '''
     features = []
     for path in paths:
-        img = load_image(path, cspace)
-        featurs.append(extract_features(img, spatial_size,
+        img = read_image(path, cspace)
+        features.append(extract_features(img, spatial_size,
                                         hist_bins, hist_range,
                                         hog_orient, hog_pix_per_cell,
                                         hog_cell_per_block, hog_channel))
@@ -84,9 +88,9 @@ def extract_features(img, spatial_size=(32, 32),
                                 hog_orient, hog_pix_per_cell, hog_cell_per_block, 
                                 vis=False, feature_vec=True))
         hog_features = np.ravel(hog_features)        
-    elif hog_channel = 'NONE':
+    elif hog_channel == 'NONE':
         pass
-     else:
+    else:
         hog_features = get_hog_features(img[:,:,hog_channel],
                                         hog_orient, hog_pix_per_cell,
                                         hog_cell_per_block, vis=False,
