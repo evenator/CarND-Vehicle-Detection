@@ -7,6 +7,7 @@ from util import read_image, draw_boxes, rgb, write_image
 parser = argparse.ArgumentParser()
 parser.add_argument('input_file', type=str, help='Image or video file to process')
 parser.add_argument('output_file', type=str, help='Output file with boxes drawn', nargs='?')
+parser.add_argument('--heat-threshold', type=float, help='Heatmap value required to activate', default=1.0)
 args = parser.parse_args()
 
 print('Loading classifier from pickle classifier.p')
@@ -20,7 +21,7 @@ print('Feature parameters:')
 print(feature_parameters)
 file_extension = args.input_file.split('.')[-1].lower()
 
-detector = Detector(classifier, feature_parameters, window_shape, scaler)
+detector = Detector(classifier, feature_parameters, window_shape, scaler, args.heat_threshold)
 
 if file_extension in ['jpg', 'png']:
     print('Loading ' + args.input_file + ' as a ' + feature_parameters['cspace'] + ' image')

@@ -62,7 +62,7 @@ print('Pickling classifier to classifier.p')
 with open('classifier.p', 'wb') as f:
     data = {
         'feature_parameters': feature_parameters,
-        'classifier': svc, 
+        'classifier': svc,
         'shape': (64, 64),
         'scaler': scaler
     }

@@ -7,6 +7,16 @@ This module contains various functions written as part of the lesson exercises
 which may be helpful here.
 '''
 
+def make_heatmap(shape, bbox_list):
+    '''
+    Create a uint8 heatmap by incrementing all the pixels inside
+    of the given bounding boxes
+    '''
+    heatmap = np.zeros(shape, dtype=np.uint8)
+    for box in bbox_list:
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+    return heatmap
+
 def rgb(src, src_cspace):
     '''
     Convert a 32 bit float [0,1] image to a uint8 image in the rgb colorspace
