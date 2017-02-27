@@ -12,17 +12,17 @@ def rgb(src, src_cspace):
     Convert a 32 bit float [0,1] image to a uint8 image in the rgb colorspace
     '''
     if src_cspace == 'HSV':
-        img = cv2.cvtColor(img, cv2.COLOR_HSV2RGB)
+        img = cv2.cvtColor(src, cv2.COLOR_HSV2RGB)
     elif src_cspace == 'HSL':
-        img = cv2.cvtColor(img, cv2.COLOR_HSL2RGB)
-    elif cspace == 'RGB':
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2RGB)
+        img = cv2.cvtColor(src, cv2.COLOR_HSL2RGB)
+    elif src_cspace == 'RGB':
+        img = cv2.cvtColor(src, cv2.COLOR_RGB2RGB)
     elif src_cspace == 'LUV':
-        img = cv2.cvtColor(img, cv2.COLOR_LUV2RGB)
+        img = cv2.cvtColor(src, cv2.COLOR_LUV2RGB)
     elif src_cspace == 'YUV':
-        img = cv2.cvtColor(img, cv2.COLOR_YUV2RGB)
-    elif cspace == 'YCrCb':
-        img = cv2.cvtColor(img, cv2.COLOR_YCrCb2RGB)
+        img = cv2.cvtColor(src, cv2.COLOR_YUV2RGB)
+    elif src_cspace == 'YCrCb':
+        img = cv2.cvtColor(src, cv2.COLOR_YCrCb2RGB)
     else:
         raise Exception("unknown colorspace " + cspace)
     if img.dtype != np.uint8:

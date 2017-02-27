@@ -45,7 +45,8 @@ non_vehicle_features = extract_features_from_images(find_images(args.non_vehicle
 print("Extracted features from {} non-vehicle images".format(len(non_vehicle_features)))
 
 X = np.vstack((vehicle_features, non_vehicle_features)).astype(np.float64)
-X_scaled = StandardScaler().fit(X).transform(X)
+scaler = StandardScaler().fit(X)
+X_scaled = scaler.transform(X)
 
 y = np.hstack((np.ones(len(vehicle_features)), np.zeros(len(non_vehicle_features))))
 
@@ -61,6 +62,8 @@ print('Pickling classifier to classifier.p')
 with open('classifier.p', 'wb') as f:
     data = {
         'feature_parameters': feature_parameters,
-        'classifier': svc
+        'classifier': svc, 
+        'shape': (64, 64),
+        'scaler': scaler
     }
     pickle.dump(data, f)

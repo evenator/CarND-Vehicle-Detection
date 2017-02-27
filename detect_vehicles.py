@@ -14,11 +14,13 @@ with open('classifier.p', 'rb') as f:
     data = pickle.load(f)
     classifier = data['classifier']
     feature_parameters = data['feature_parameters']
+    window_shape = data['shape']
+    scaler = data['scaler']
 print('Feature parameters:')
 print(feature_parameters)
 file_extension = args.input_file.split('.')[-1].lower()
 
-detector = Detector(classifier, feature_parameters)
+detector = Detector(classifier, feature_parameters, window_shape, scaler)
 
 if file_extension in ['jpg', 'png']:
     print('Loading ' + args.input_file + ' as a ' + feature_parameters['cspace'] + ' image')
