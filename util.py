@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 from skimage.feature import hog
 
 '''
@@ -66,6 +67,8 @@ def read_image(path, cspace='RGB'):
     '''
     Load image and convert to 32-bit float [0,1] in the requested colorspace
     '''
+    if not os.path.exists(path):
+        raise IOError(path + " does not exist or could not be loaded")
     img = cv2.imread(path).astype(np.float32)/255
     if cspace == 'HSV':
         img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
