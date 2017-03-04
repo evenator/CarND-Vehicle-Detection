@@ -66,22 +66,28 @@ class Detector(object):
         ]
         hits = []
         for scale, overlap, x_range, y_range in scales:
+            # Calculate ROI to avoid processing more than we have to
             roi_x = (int(x_range[0] * img.shape[1]), int(x_range[1] * img.shape[1]))
             roi_y = (int(y_range[0] * img.shape[0]), int(y_range[1] * img.shape[0]))
             roi = img[roi_y[0]:roi_y[1], roi_x[0]:roi_x[1], :]
+            # Scale the ROI
             scaled_shape = (int(roi.shape[1] * scale), int(roi.shape[0] * scale))
             scaled_roi = cv2.resize(roi, scaled_shape)
+            # Calculate HOG features for whole scaled ROI at once
             hog = [get_hog_features(scaled_roi[:,:,c],
                                 orient = self._feature_parameters['hog_orient'],
                                 pix_per_cell = self._feature_parameters['hog_pix_per_cell'],
                                 cell_per_block = self._feature_parameters['hog_cell_per_block'],
                                 feature_vec=False) for c in range(scaled_roi.shape[-1])]
             hog_shape = hog[0].shape
-            histo = [windowed_histogram((scaled_roi[:,:,c]*255).astype(np.uint8),
+            # Calculate color features for whole scaled ROI at once
+            if self._feature_parameters['hist_bins'] > 0:
+                histo = [windowed_histogram((scaled_roi[:,:,c]*255).astype(np.uint8),
                         selem=np.ones(self._shape),
                         shift_x = -self._shape[1]/2,
                         shift_y = -self._shape[0]/2,
                         n_bins=self._feature_parameters['hist_bins']) for c in range(scaled_roi.shape[-1])]
+            # Calculate bounds for iterating over the HOG feature image
             x_start = 0
             x_stop = hog_shape[1] - x_cells_per_window + 1
             x_step = int((1 - overlap) * x_cells_per_window)
@@ -90,19 +96,23 @@ class Detector(object):
             y_step = int((1 - overlap) * y_cells_per_window)
             for x in range(x_start, x_stop, x_step):
                 for y in range(y_start, y_stop, y_step):
-                    color_features = []
-                    spatial_features = []
-                    # TODO: Add spatial?
-                    window_start = (roi_x[0] + int(x/scale * pix_per_cell), roi_y[0] + int(y/scale * pix_per_cell))
-                    window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
-                    hog_features = np.hstack([h[y:y+y_cells_per_window, x:x+x_cells_per_window].ravel() for h in hog])
-                    window = img[window_start[1]:window_end[1], window_start[0]:window_end[0], :]
+                    # Extract color features
                     if self._feature_parameters['hist_bins'] > 0:
                         color_features = np.hstack([h[(y * pix_per_cell), (x * pix_per_cell), :].ravel() for h in histo])
-                        #color_features = color_hist(window, self._feature_parameters['hist_bins'], self._feature_parameters['hist_range'])[-1]
+                    else:
+                        color_features = []
+                    # TODO: Add spatial?
+                    spatial_features = []
+                    # Extract hog features
+                    hog_features = np.hstack([h[y:y+y_cells_per_window, x:x+x_cells_per_window].ravel() for h in hog])
+                    # Vectorize features
                     features = np.concatenate((spatial_features, color_features, hog_features))
                     features = features.reshape(1, -1)
                     features = self._scaler.transform(features)
+                    # Create window (in unscaled image dimensions)
+                    window_start = (roi_x[0] + int(x/scale * pix_per_cell), roi_y[0] + int(y/scale * pix_per_cell))
+                    window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
+                    # Check if the window is a vehicle
                     if self._classifier.decision_function(features) > 1.0:
                         hits.append((window_start, window_end))
         return hits
