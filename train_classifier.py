@@ -26,7 +26,7 @@ args = parser.parse_args()
 feature_parameters = {
     'cspace': 'YCrCb',
     'spatial_size': None, #(32, 32),
-    'hist_bins': 0, #32,
+    'hist_bins': 32,
     'hist_range': (0, 256),
     'hog_orient': 9,
     'hog_pix_per_cell': 8,
@@ -55,7 +55,14 @@ X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
 print("Training...")
 svc = LinearSVC()
 svc.fit(X_train, y_train)
-print('Test Accuracy: {:.4f}'.format(svc.score(X_test, y_test)))
+positives = y_test.nonzero()
+negatives = np.logical_not(y_test).nonzero()
+tp = svc.score(X_test[positives], y_test[positives])
+tn = svc.score(X_test[negatives], y_test[negatives])
+print('True Positive Rate:  {:.2f}'.format(100*tp))
+print('True Negative Rate:  {:.2f}'.format(100*tn))
+print('False Positive Rate: {:.2f}'.format(100*(1-tn)))
+print('False Negative Rate: {:.2f}'.format(100*(1-tp)))
 
 
 print('Pickling classifier to classifier.p')

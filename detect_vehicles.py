@@ -28,8 +28,9 @@ if file_extension in ['jpg', 'png']:
     img = read_image(args.input_file, feature_parameters['cspace'])
     print('Detecting vehicles')
     boxes = detector(img)
+    print(boxes)
     output = draw_boxes(rgb(img, feature_parameters['cspace']), boxes)
-    if args.output_file and not args.output_file.empty():
+    if args.output_file and len(args.output_file):
         print('Writing output to ' + args.output_file)
         write_image(args.output_file, output, 'RGB')
     else:

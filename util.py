@@ -44,17 +44,17 @@ def write_image(path, src, src_cspace):
     Write an image to a file. Input can be 32-bit float [0,1] or uint8
     '''
     if src_cspace == 'HSV':
-        img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+        img = cv2.cvtColor(src, cv2.COLOR_HSV2BGR)
     elif src_cspace == 'HSL':
-        img = cv2.cvtColor(img, cv2.COLOR_HSL2BGR)
-    elif cspace == 'RGB':
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img = cv2.cvtColor(src, cv2.COLOR_HSL2BGR)
+    elif src_cspace == 'RGB':
+        img = cv2.cvtColor(src, cv2.COLOR_RGB2BGR)
     elif src_cspace == 'LUV':
-        img = cv2.cvtColor(img, cv2.COLOR_LUV2RGB)
+        img = cv2.cvtColor(src, cv2.COLOR_LUV2RGB)
     elif src_cspace == 'YUV':
-        img = cv2.cvtColor(img, cv2.COLOR_YUV2BGR)
+        img = cv2.cvtColor(src, cv2.COLOR_YUV2BGR)
     elif src_cspace == 'YCrCb':
-        img = cv2.cvtColor(img, cv2.COLOR_YCrCb2BGR)
+        img = cv2.cvtColor(src, cv2.COLOR_YCrCb2BGR)
     else:
         raise Exception("unknown colorspace " + cspace)
     if img.dtype != np.uint8:
@@ -126,7 +126,10 @@ def extract_features_from_images(paths, cspace='RGB', spatial_size=None,
                                         hist_bins, hist_range,
                                         hog_orient, hog_pix_per_cell,
                                         hog_cell_per_block, hog_channel))
-    return features
+    return np.array(features)
+
+def hog_img(img, orient=9, pix_per_cell = 8, cell_per_block=2):
+    return [get_hog_features(channel, orient, pix_per_cell, cell_per_block, feature_vec=False) for channel in img.T]
 
 def extract_features(img, spatial_size=(32, 32),
                      hist_bins=0, hist_range=(0, 256),
@@ -139,7 +142,7 @@ def extract_features(img, spatial_size=(32, 32),
         spatial_features = bin_spatial(img, spatial_size)
     color_features = []
     if hist_bins > 0:
-        color_features = color_hist(img, hist_bins, hist_range)
+        color_features = color_hist(img, hist_bins, hist_range)[-1]
     if hog_channel == 'ALL':
         hog_features = []
         for channel in range(img.shape[2]):

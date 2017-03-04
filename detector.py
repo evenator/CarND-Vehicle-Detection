@@ -1,4 +1,4 @@
-from util import extract_features, rgb, slide_window, draw_boxes, make_heatmap
+from util import extract_features, rgb, slide_window, draw_boxes, make_heatmap, get_hog_features, color_hist
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,8 +14,8 @@ class Detector(object):
         self._cspace = self._feature_parameters['cspace']
         del self._feature_parameters['cspace']
 
-    def __call__(self, img, show_plots=False):
-        hits = self.get_hits(img)
+    def __call__(self, img, show_plots=True):
+        hits = self.get_hits_faster(img)
         heat = make_heatmap(img.shape[0:2], hits)
         binary = heat >= self._threshold
         labels = label_image(binary)
@@ -49,15 +49,67 @@ class Detector(object):
                 hits.append(window)
         return hits
 
+    def get_hits_faster(self, img):
+        pix_per_cell = self._feature_parameters['hog_pix_per_cell']
+        scales = [
+#                 (2.0, 0.0, [ 1/3,  2/3], [.5, .75]),
+#                 (4/3, 0.0, [0, 1], [.5, .75]),
+#                 (1.0, 0.5, [0, 1], [.5, .75]),
+#                 (0.8, 0.5, [0, 1], [.5, .75]),
+                 (2/3, 0.75, [0, 1], [.5, .875]),
+#                 (4/7, 0.75, [0, 1], [.5, .875]),
+                 (0.5, 0.75, [0, 1], [.5, .875]),
+                 (0.25, 0.75, [0, 1], [.5, .875])
+        ]
+        hits = []
+        for scale, overlap, x_range, y_range in scales:
+            new_shape = (int(img.shape[1] * scale), int(img.shape[0] * scale))
+            scaled_img = cv2.resize(img, new_shape)
+            hog = [get_hog_features(
+                                scaled_img[:,:,c],
+                                orient = self._feature_parameters['hog_orient'],
+                                pix_per_cell = self._feature_parameters['hog_pix_per_cell'],
+                                cell_per_block = self._feature_parameters['hog_cell_per_block'],
+                                feature_vec=False) for c in range(scaled_img.shape[2])]
+            hog_shape = hog[0].shape
+
+            x_block = self._shape[1] // pix_per_cell - 1
+            y_block = self._shape[0] // pix_per_cell - 1
+
+            x_start = int(x_range[0]*hog_shape[1])
+            x_stop = int(x_range[1]*hog_shape[1]) - x_block + 1
+            x_step = int((1 - overlap) * x_block)
+            y_start = int(y_range[0]*hog_shape[0])
+            y_stop = int(y_range[1]*hog_shape[0]) - y_block + 1
+            y_step = int((1 - overlap) * y_block)
+            for x in range(x_start, x_stop, x_step):
+                for y in range(y_start, y_stop, y_step):
+                    # TODO: Add spatial?
+                    window_start = (int(x/scale * pix_per_cell), int(y/scale * pix_per_cell))
+                    window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
+                    hog_features = np.hstack([h[y:y+y_block, x:x+x_block].ravel() for h in hog])
+                    color_features = []
+                    spatial_features = []
+                    roi = img[window_start[1]:window_end[1], window_start[0]:window_end[0], :]
+                    if self._feature_parameters['hist_bins'] > 0:
+                        color_features = color_hist(roi, self._feature_parameters['hist_bins'], self._feature_parameters['hist_range'])[-1]
+                    features = np.concatenate((spatial_features, color_features, hog_features))
+                    features = features.reshape(1, -1)
+                    features = self._scaler.transform(features)
+                    if self._classifier.decision_function(features) > 1.0:
+                        hits.append((window_start, window_end))
+        return hits
+
     def get_windows(self, img):
         height, width, depth = img.shape
-        sizes = [(32,  0.5, [width//3, 2*width//3], [height//2, 3*height//4]),
-                 (48,  0.0, [None, None], [height//2, 3*height//4]),
-                 (64,  0.5, [None, None], [height//2, 3*height//4]),
-                 (80,  0.5, [None, None], [height//2, 3*height//4]),
-                 (96,  0.5, [None, None], [height//2, 7*height//8]),
-                 (112, 0.5, [None, None], [height//2, 7*height//8]),
-                 (128, 0.5, [None, None], [height//2, 7*height//8])]
+        sizes = [
+#                 (32,  0.5, [width//3, 2*width//3], [height//2, 3*height//4]),
+#                 (48,  0.0, [None, None], [height//2, 3*height//4]),
+#                 (64,  0.5, [None, None], [height//2, 3*height//4]),
+#                 (80,  0.5, [None, None], [height//2, 3*height//4]),
+#                 (96,  0.5, [None, None], [height//2, 7*height//8]),
+#                 (112, 0.5, [None, None], [height//2, 7*height//8]),
+                 (128, 0.75, [None, None], [height//2, 7*height//8])]
         windows = []
         for size, overlap, x_range, y_range in sizes:
             windows.extend(slide_window(img,
