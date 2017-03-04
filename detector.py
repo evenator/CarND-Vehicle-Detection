@@ -6,7 +6,9 @@ from scipy.ndimage.measurements import label as label_image
 from skimage.filters.rank import windowed_histogram
 
 class Detector(object):
-    def __init__(self, classifier, feature_parameters, shape, scaler, heat_threshold):
+    def __init__(self, classifier, feature_parameters, shape, scaler, heat_threshold, alpha=1.0):
+        self._alpha = alpha
+        self._last_heatmap = None
         self._classifier = classifier
         self._feature_parameters = dict(feature_parameters)
         self._shape = shape
@@ -15,10 +17,15 @@ class Detector(object):
         self._cspace = self._feature_parameters['cspace']
         del self._feature_parameters['cspace']
 
-    def __call__(self, img, show_plots=True):
-        hits = self.get_hits_faster(img)
+    def __call__(self, img, show_plots=False):
+        hits = self.get_hits(img)
+        return hits
         heat = make_heatmap(img.shape[0:2], hits)
-        binary = heat >= self._threshold
+        if self._last_heatmap is None:
+            self._last_heatmap = heat
+        filtered_heat = (1-self._alpha) * self._last_heatmap + self._alpha * heat
+        self._last_heatmap = filtered_heat
+        binary = filtered_heat >= self._threshold
         labels = label_image(binary)
         boxes = []
         for i in range(labels[1]):
@@ -38,19 +45,6 @@ class Detector(object):
         return boxes
 
     def get_hits(self, img):
-        windows = self.get_windows(img)
-        hits = []
-        for window in windows:
-            roi = img[window[0][1]:window[1][1], window[0][0]:window[1][0], :]
-            if roi.shape[0:2] != self._shape:
-                roi = cv2.resize(roi, self._shape)
-            features = extract_features(roi, **self._feature_parameters).reshape(1, -1)
-            features = self._scaler.transform(features)
-            if self._classifier.predict(features) == 1:
-                hits.append(window)
-        return hits
-
-    def get_hits_faster(self, img):
         pix_per_cell = self._feature_parameters['hog_pix_per_cell']
         x_cells_per_window = self._shape[1] // pix_per_cell - 1
         y_cells_per_window = self._shape[0] // pix_per_cell - 1
@@ -116,22 +110,3 @@ class Detector(object):
                     if self._classifier.decision_function(features) > 1.0:
                         hits.append((window_start, window_end))
         return hits
-
-    def get_windows(self, img):
-        height, width, depth = img.shape
-        sizes = [
-#                 (32,  0.5, [width//3, 2*width//3], [height//2, 3*height//4]),
-#                 (48,  0.0, [None, None], [height//2, 3*height//4]),
-#                 (64,  0.5, [None, None], [height//2, 3*height//4]),
-#                 (80,  0.5, [None, None], [height//2, 3*height//4]),
-#                 (96,  0.5, [None, None], [height//2, 7*height//8]),
-#                 (112, 0.5, [None, None], [height//2, 7*height//8]),
-                 (128, 0.75, [None, None], [height//2, 7*height//8])]
-        windows = []
-        for size, overlap, x_range, y_range in sizes:
-            windows.extend(slide_window(img,
-                                        x_start_stop=x_range,
-                                        y_start_stop=y_range,
-                                        xy_window=(size, size),
-                                        xy_overlap=(overlap, overlap)))
-        return windows

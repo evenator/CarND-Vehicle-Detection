@@ -8,12 +8,29 @@ This module contains various functions written as part of the lesson exercises
 which may be helpful here.
 '''
 
+def convert_video_frame(frame, cspace='RGB'):
+    if cspace == 'HSV':
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+    elif cspace == 'HSL':
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSL)
+    elif cspace == 'RGB':
+        pass
+    elif cspace == 'LUV':
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2LUV)
+    elif cspace == 'YUV':
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2YUV)
+    elif cspace == 'YCrCb':
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2YCrCb)
+    else:
+        raise Exception("unknown colorspace " + cspace)
+    return frame
+
 def make_heatmap(shape, bbox_list):
     '''
     Create a uint8 heatmap by incrementing all the pixels inside
     of the given bounding boxes
     '''
-    heatmap = np.zeros(shape, dtype=np.uint8)
+    heatmap = np.zeros(shape, dtype=np.float32)
     for box in bbox_list:
         heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
     return heatmap
