@@ -3,6 +3,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage.measurements import label as label_image
+from skimage.filters.rank import windowed_histogram
 
 class Detector(object):
     def __init__(self, classifier, feature_parameters, shape, scaler, heat_threshold):
@@ -51,6 +52,8 @@ class Detector(object):
 
     def get_hits_faster(self, img):
         pix_per_cell = self._feature_parameters['hog_pix_per_cell']
+        x_cells_per_window = self._shape[1] // pix_per_cell - 1
+        y_cells_per_window = self._shape[0] // pix_per_cell - 1
         scales = [
 #                 (2.0, 0.0, [ 1/3,  2/3], [.5, .75]),
 #                 (4/3, 0.0, [0, 1], [.5, .75]),
@@ -63,36 +66,40 @@ class Detector(object):
         ]
         hits = []
         for scale, overlap, x_range, y_range in scales:
-            new_shape = (int(img.shape[1] * scale), int(img.shape[0] * scale))
-            scaled_img = cv2.resize(img, new_shape)
-            hog = [get_hog_features(
-                                scaled_img[:,:,c],
+            roi_x = (int(x_range[0] * img.shape[1]), int(x_range[1] * img.shape[1]))
+            roi_y = (int(y_range[0] * img.shape[0]), int(y_range[1] * img.shape[0]))
+            roi = img[roi_y[0]:roi_y[1], roi_x[0]:roi_x[1], :]
+            scaled_shape = (int(roi.shape[1] * scale), int(roi.shape[0] * scale))
+            scaled_roi = cv2.resize(roi, scaled_shape)
+            hog = [get_hog_features(scaled_roi[:,:,c],
                                 orient = self._feature_parameters['hog_orient'],
                                 pix_per_cell = self._feature_parameters['hog_pix_per_cell'],
                                 cell_per_block = self._feature_parameters['hog_cell_per_block'],
-                                feature_vec=False) for c in range(scaled_img.shape[2])]
+                                feature_vec=False) for c in range(scaled_roi.shape[-1])]
             hog_shape = hog[0].shape
-
-            x_block = self._shape[1] // pix_per_cell - 1
-            y_block = self._shape[0] // pix_per_cell - 1
-
-            x_start = int(x_range[0]*hog_shape[1])
-            x_stop = int(x_range[1]*hog_shape[1]) - x_block + 1
-            x_step = int((1 - overlap) * x_block)
-            y_start = int(y_range[0]*hog_shape[0])
-            y_stop = int(y_range[1]*hog_shape[0]) - y_block + 1
-            y_step = int((1 - overlap) * y_block)
+            histo = [windowed_histogram((scaled_roi[:,:,c]*255).astype(np.uint8),
+                        selem=np.ones(self._shape),
+                        shift_x = -self._shape[1]/2,
+                        shift_y = -self._shape[0]/2,
+                        n_bins=self._feature_parameters['hist_bins']) for c in range(scaled_roi.shape[-1])]
+            x_start = 0
+            x_stop = hog_shape[1] - x_cells_per_window + 1
+            x_step = int((1 - overlap) * x_cells_per_window)
+            y_start = 0
+            y_stop = hog_shape[0] - y_cells_per_window + 1
+            y_step = int((1 - overlap) * y_cells_per_window)
             for x in range(x_start, x_stop, x_step):
                 for y in range(y_start, y_stop, y_step):
-                    # TODO: Add spatial?
-                    window_start = (int(x/scale * pix_per_cell), int(y/scale * pix_per_cell))
-                    window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
-                    hog_features = np.hstack([h[y:y+y_block, x:x+x_block].ravel() for h in hog])
                     color_features = []
                     spatial_features = []
-                    roi = img[window_start[1]:window_end[1], window_start[0]:window_end[0], :]
+                    # TODO: Add spatial?
+                    window_start = (roi_x[0] + int(x/scale * pix_per_cell), roi_y[0] + int(y/scale * pix_per_cell))
+                    window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
+                    hog_features = np.hstack([h[y:y+y_cells_per_window, x:x+x_cells_per_window].ravel() for h in hog])
+                    window = img[window_start[1]:window_end[1], window_start[0]:window_end[0], :]
                     if self._feature_parameters['hist_bins'] > 0:
-                        color_features = color_hist(roi, self._feature_parameters['hist_bins'], self._feature_parameters['hist_range'])[-1]
+                        color_features = np.hstack([h[(y * pix_per_cell), (x * pix_per_cell), :].ravel() for h in histo])
+                        #color_features = color_hist(window, self._feature_parameters['hist_bins'], self._feature_parameters['hist_range'])[-1]
                     features = np.concatenate((spatial_features, color_features, hog_features))
                     features = features.reshape(1, -1)
                     features = self._scaler.transform(features)
