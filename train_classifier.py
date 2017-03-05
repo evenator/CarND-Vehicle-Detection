@@ -27,7 +27,6 @@ feature_parameters = {
     'cspace': 'YCrCb',
     'spatial_size': None, #(32, 32),
     'hist_bins': 32,
-    'hist_range': (0, 256),
     'hog_orient': 9,
     'hog_pix_per_cell': 8,
     'hog_cell_per_block': 2,

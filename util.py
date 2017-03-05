@@ -104,16 +104,9 @@ def read_image(path, cspace='RGB'):
     return img
 
 def color_hist(img, nbins=32, bins_range=(0, 256)):
-    # Compute the histogram of the 3 channels separately
-    hist0 = np.histogram(img[:,:,0], nbins, bins_range)
-    hist1 = np.histogram(img[:,:,1], nbins, bins_range)
-    hist2 = np.histogram(img[:,:,2], nbins, bins_range)
-    # Generating bin centers
-    bin_centers = hist0[1]
-    # Concatenate the histograms into a single feature vector
-    hist_features = np.concatenate((hist0[0], hist1[0], hist2[0]))
-    # Return the individual histograms, bin_centers and feature vector
-    return hist0, hist1, hist2, bin_centers, hist_features
+    ''' Compute the normalized color histogram'''
+    n_pix = img.shape[0] * img.shape[1]
+    return np.concatenate([np.histogram(img[:,:,c], nbins, bins_range)[0] for c in range(img.shape[-1])])/n_pix
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     output = np.copy(img)
@@ -134,7 +127,7 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block, vis=False,
                transform_sqrt=True, visualise=vis, feature_vector=feature_vec)
 
 def extract_features_from_images(paths, cspace='RGB', spatial_size=None,
-                     hist_bins=0, hist_range=(0, 256),
+                     hist_bins=0,
                      hog_orient=9, hog_pix_per_cell = 8, hog_cell_per_block=2, hog_channel=0):
     '''
     Extract features from a list of image paths
@@ -143,7 +136,7 @@ def extract_features_from_images(paths, cspace='RGB', spatial_size=None,
     for path in paths:
         img = read_image(path, cspace)
         features.append(extract_features(img, spatial_size,
-                                        hist_bins, hist_range,
+                                        hist_bins,
                                         hog_orient, hog_pix_per_cell,
                                         hog_cell_per_block, hog_channel))
     return np.array(features)
@@ -152,7 +145,7 @@ def hog_img(img, orient=9, pix_per_cell = 8, cell_per_block=2):
     return [get_hog_features(channel, orient, pix_per_cell, cell_per_block, feature_vec=False) for channel in img.T]
 
 def extract_features(img, spatial_size=(32, 32),
-                     hist_bins=0, hist_range=(0, 256),
+                     hist_bins=0,
                      hog_orient=9, hog_pix_per_cell = 8, hog_cell_per_block=2, hog_channel=0):
     '''
     Extract features from a single image
@@ -162,7 +155,7 @@ def extract_features(img, spatial_size=(32, 32),
         spatial_features = bin_spatial(img, spatial_size)
     color_features = []
     if hist_bins > 0:
-        color_features = color_hist(img, hist_bins, hist_range)[-1]
+        color_features = color_hist(img*255, hist_bins)
     if hog_channel == 'ALL':
         hog_features = []
         for channel in range(img.shape[2]):

@@ -76,7 +76,7 @@ class Detector(object):
             hog_shape = hog[0].shape
             # Calculate color features for whole scaled ROI at once
             if self._feature_parameters['hist_bins'] > 0:
-                histo = [windowed_histogram((scaled_roi[:,:,c]*255).astype(np.uint8),
+                histo = [windowed_histogram((scaled_roi[:,:,c]*255/256*feature_parameters['hist_bins']).astype(np.uint8),
                         selem=np.ones(self._shape),
                         shift_x = -self._shape[1]/2,
                         shift_y = -self._shape[0]/2,
