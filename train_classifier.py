@@ -25,7 +25,7 @@ args = parser.parse_args()
 # TODO: Argify these
 feature_parameters = {
     'cspace': 'YCrCb',
-    'spatial_size': None, #(32, 32),
+    'spatial_size': (32, 32),
     'hist_bins': 32,
     'hog_orient': 9,
     'hog_pix_per_cell': 8,
@@ -44,12 +44,14 @@ non_vehicle_features = extract_features_from_images(find_images(args.non_vehicle
 print("Extracted features from {} non-vehicle images".format(len(non_vehicle_features)))
 
 X = np.vstack((vehicle_features, non_vehicle_features)).astype(np.float64)
-scaler = StandardScaler().fit(X)
-X_scaled = scaler.transform(X)
-
 y = np.hstack((np.ones(len(vehicle_features)), np.zeros(len(non_vehicle_features))))
 
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+scaler = StandardScaler().fit(X_train)
+X_train = scaler.transform(X_train)
+X_test = scaler.transform(X_test)
+
 
 print("Training...")
 svc = LinearSVC()
@@ -58,10 +60,10 @@ positives = y_test.nonzero()
 negatives = np.logical_not(y_test).nonzero()
 tp = svc.score(X_test[positives], y_test[positives])
 tn = svc.score(X_test[negatives], y_test[negatives])
-print('True Positive Rate:  {:.2f}'.format(100*tp))
-print('True Negative Rate:  {:.2f}'.format(100*tn))
-print('False Positive Rate: {:.2f}'.format(100*(1-tn)))
-print('False Negative Rate: {:.2f}'.format(100*(1-tp)))
+print('True Positive Rate:  {:.2f}%'.format(100*tp))
+print('True Negative Rate:  {:.2f}%'.format(100*tn))
+print('False Positive Rate: {:.2f}%'.format(100*(1-tn)))
+print('False Negative Rate: {:.2f}%'.format(100*(1-tp)))
 
 
 print('Pickling classifier to classifier.p')

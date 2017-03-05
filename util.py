@@ -31,8 +31,13 @@ def make_heatmap(shape, bbox_list):
     of the given bounding boxes
     '''
     heatmap = np.zeros(shape, dtype=np.float32)
-    for box in bbox_list:
-        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+    for item in bbox_list:
+        box = item[0], item[1]
+        if len(item) > 2:
+            heat = item[2]
+        else:
+            heat = 1
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += heat
     return heatmap
 
 def rgb(src, src_cspace):
@@ -111,6 +116,8 @@ def color_hist(img, nbins=32, bins_range=(0, 256)):
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     output = np.copy(img)
     for bb in bboxes:
+        if len(bb) > 2:
+            color = np.array(color) * bb[2]
         cv2.rectangle(output, bb[0], bb[1], color, thick)
     return output
 

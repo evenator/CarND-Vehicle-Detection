@@ -1,4 +1,4 @@
-from util import extract_features, rgb, slide_window, draw_boxes, make_heatmap, get_hog_features, color_hist
+from util import extract_features, rgb, slide_window, draw_boxes, make_heatmap, get_hog_features, color_hist, bin_spatial
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,7 +19,7 @@ class Detector(object):
 
     def __call__(self, img, show_plots=False):
         hits = self.get_hits(img)
-        return hits
+        #return hits
         heat = make_heatmap(img.shape[0:2], hits)
         if self._last_heatmap is None:
             self._last_heatmap = heat
@@ -30,8 +30,12 @@ class Detector(object):
         boxes = []
         for i in range(labels[1]):
             y_points, x_points = np.where(labels[0] == i+1)
-            boxes.append(((np.min(x_points), np.min(y_points)),
-                          (np.max(x_points), np.max(y_points))))
+            box = ((np.min(x_points), np.min(y_points)),
+                   (np.max(x_points), np.max(y_points)))
+            width = box[1][0] - box[0][0]
+            height = box[1][1] - box[0][1]
+            if width >= 32 and height >= 32:
+                boxes.append(box)
         if show_plots:
             f, ((a0, a1), (a2, a3)) = plt.subplots(2, 2)
             a0.set_title('Raw Hits')
@@ -49,14 +53,15 @@ class Detector(object):
         x_cells_per_window = self._shape[1] // pix_per_cell - 1
         y_cells_per_window = self._shape[0] // pix_per_cell - 1
         scales = [
-#                 (2.0, 0.0, [ 1/3,  2/3], [.5, .75]),
-#                 (4/3, 0.0, [0, 1], [.5, .75]),
-#                 (1.0, 0.5, [0, 1], [.5, .75]),
+                 (2.0, 0.0, [ 1/3, 2/3], [.55, .64]),
+                 (64/48, 0.5, [0, 1], [.5, .75]),
+                 (1.0, 0.5, [1/3, 2/3], [.55, .9]),
 #                 (0.8, 0.5, [0, 1], [.5, .75]),
-                 (2/3, 0.75, [0, 1], [.5, .875]),
+                 (2/3, 0.75, [1/3, 2/3], [.5, .875]),
 #                 (4/7, 0.75, [0, 1], [.5, .875]),
                  (0.5, 0.75, [0, 1], [.5, .875]),
-                 (0.25, 0.75, [0, 1], [.5, .875])
+                 (0.375, 0.75, [0, 1], [.55, 1]),
+                 (0.25, 0.75, [0, 1], [.5, 1])
         ]
         hits = []
         for scale, overlap, x_range, y_range in scales:
@@ -68,15 +73,24 @@ class Detector(object):
             scaled_shape = (int(roi.shape[1] * scale), int(roi.shape[0] * scale))
             scaled_roi = cv2.resize(roi, scaled_shape)
             # Calculate HOG features for whole scaled ROI at once
-            hog = [get_hog_features(scaled_roi[:,:,c],
+            if self._feature_parameters['hog_channel'] == 'ALL':
+                hog = [get_hog_features(scaled_roi[:,:,c],
                                 orient = self._feature_parameters['hog_orient'],
                                 pix_per_cell = self._feature_parameters['hog_pix_per_cell'],
                                 cell_per_block = self._feature_parameters['hog_cell_per_block'],
                                 feature_vec=False) for c in range(scaled_roi.shape[-1])]
+            else:
+                c = self._feature_parameters['hog_channel']
+                hog = [get_hog_features(scaled_roi[:,:,c],
+                                orient = self._feature_parameters['hog_orient'],
+                                pix_per_cell = self._feature_parameters['hog_pix_per_cell'],
+                                cell_per_block = self._feature_parameters['hog_cell_per_block'],
+                                feature_vec=False)]
             hog_shape = hog[0].shape
             # Calculate color features for whole scaled ROI at once
-            if self._feature_parameters['hist_bins'] > 0:
-                histo = [windowed_histogram((scaled_roi[:,:,c]*255/256*feature_parameters['hist_bins']).astype(np.uint8),
+            hist_bins = self._feature_parameters['hist_bins']
+            if hist_bins > 0:
+                histo = [windowed_histogram((scaled_roi[:,:,c]*255/256*hist_bins).astype(np.uint8),
                         selem=np.ones(self._shape),
                         shift_x = -self._shape[1]/2,
                         shift_y = -self._shape[0]/2,
@@ -92,21 +106,35 @@ class Detector(object):
                 for y in range(y_start, y_stop, y_step):
                     # Extract color features
                     if self._feature_parameters['hist_bins'] > 0:
-                        color_features = np.hstack([h[(y * pix_per_cell), (x * pix_per_cell), :].ravel() for h in histo])
+                        color_features = np.ravel([h[(y * pix_per_cell), (x * pix_per_cell), :].ravel() for h in histo])
                     else:
                         color_features = []
-                    # TODO: Add spatial?
-                    spatial_features = []
+
                     # Extract hog features
-                    hog_features = np.hstack([h[y:y+y_cells_per_window, x:x+x_cells_per_window].ravel() for h in hog])
+                    hog_features = np.ravel([h[y:y+y_cells_per_window, x:x+x_cells_per_window].ravel() for h in hog])
+
+                    # Create window (in unscaled image dimensions)
+                    window_start = (roi_x[0] + int(x/scale * pix_per_cell), roi_y[0] + int(y/scale * pix_per_cell))
+                    window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
+                    
+                    # Extract spatial features
+                    # TODO: Resize only once
+                    if self._feature_parameters['spatial_size'] is not None:
+                        spatial_window = img[window_start[1]:window_end[1], window_start[0]:window_end[0],:]
+                        spatial_features = bin_spatial(spatial_window, self._feature_parameters['spatial_size'])
+                    else:
+                        spatial_features = []
+
                     # Vectorize features
                     features = np.concatenate((spatial_features, color_features, hog_features))
                     features = features.reshape(1, -1)
                     features = self._scaler.transform(features)
-                    # Create window (in unscaled image dimensions)
-                    window_start = (roi_x[0] + int(x/scale * pix_per_cell), roi_y[0] + int(y/scale * pix_per_cell))
-                    window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
+
                     # Check if the window is a vehicle
-                    if self._classifier.decision_function(features) > 1.0:
-                        hits.append((window_start, window_end))
+                    carness = self._classifier.decision_function(features)
+                    if carness > 0.3:
+                        hits.append((window_start, window_end, scale**2))#, carness))
+                    #elif carness < -4:
+                    #    hits.append((window_start, window_end, carness*scale))
+                           
         return hits
