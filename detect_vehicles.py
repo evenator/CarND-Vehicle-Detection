@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('input_file', type=str, help='Image or video file to process')
 parser.add_argument('output_file', type=str, help='Output file with boxes drawn', nargs='?')
 parser.add_argument('--heat-threshold', type=float, help='Heatmap value required to activate', default=2.25)
-parser.add_argument('--smoothing', type=float, help='Alpha value for heatmap smoothing filter', default=1.0)
+parser.add_argument('--smoothing', type=float, help='Alpha value for heatmap smoothing filter', default=0.125)
 parser.add_argument('--subclip', type=float, nargs=2, required=False, help='Beginning and end times of video')
 args = parser.parse_args()
 
