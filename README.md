@@ -102,7 +102,7 @@ manageable.
 
 Ultimately, I decided on the following set of scales, overlaps, and ROIs:
 
-** Scales table **
+**Scales table**
 
 **Some discussion is given around how you improved the reliability of the classifier i.e., fewer false positives and more reliable car detections (this could be things like choice of feature vector, thresholding the decision function, hard negative mining etc.)**
 

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage.measurements import label as label_image
 from skimage.filters.rank import windowed_histogram
+import time
 
 class Detector(object):
     def __init__(self, classifier, feature_parameters, shape, scaler, heat_threshold, alpha=1.0):
@@ -19,7 +20,6 @@ class Detector(object):
 
     def __call__(self, img, show_plots=False):
         hits = self.get_hits(img)
-        #return hits
         heat = make_heatmap(img.shape[0:2], hits)
         if self._last_heatmap is None:
             self._last_heatmap = heat
@@ -48,23 +48,24 @@ class Detector(object):
             a3.imshow(labels[0], cmap='gray')
         return boxes
 
-    def get_hits(self, img):
+    def get_hits(self, img, print_debug=False):
         pix_per_cell = self._feature_parameters['hog_pix_per_cell']
         x_cells_per_window = self._shape[1] // pix_per_cell - 1
         y_cells_per_window = self._shape[0] // pix_per_cell - 1
         scales = [
-                 (2.0, 0.0, [ 1/3, 2/3], [.55, .64]),
+                 (2.0, 0.0, [ 1/4, 3/4], [.55, .64]),
                  (64/48, 0.5, [0, 1], [.5, .75]),
                  (1.0, 0.5, [1/3, 2/3], [.55, .9]),
-#                 (0.8, 0.5, [0, 1], [.5, .75]),
-                 (2/3, 0.75, [1/3, 2/3], [.5, .875]),
-#                 (4/7, 0.75, [0, 1], [.5, .875]),
-                 (0.5, 0.75, [0, 1], [.5, .875]),
-                 (0.375, 0.75, [0, 1], [.55, 1]),
-                 (0.25, 0.75, [0, 1], [.5, 1])
+                 (4/7, 0.75, [0, 1], [.5, .875]),
+                 (0.5, 0.75, [0, 1], [.5, .875])
         ]
         hits = []
+        if self._feature_parameters['spatial_size']:
+            spatial_scale_x = self._feature_parameters['spatial_size'][0] / self._shape[0]
+            spatial_scale_y = self._feature_parameters['spatial_size'][1] / self._shape[1]
         for scale, overlap, x_range, y_range in scales:
+            start_time = time.clock()
+            start_hits = len(hits)
             # Calculate ROI to avoid processing more than we have to
             roi_x = (int(x_range[0] * img.shape[1]), int(x_range[1] * img.shape[1]))
             roi_y = (int(y_range[0] * img.shape[0]), int(y_range[1] * img.shape[0]))
@@ -95,6 +96,11 @@ class Detector(object):
                         shift_x = -self._shape[1]/2,
                         shift_y = -self._shape[0]/2,
                         n_bins=self._feature_parameters['hist_bins']) for c in range(scaled_roi.shape[-1])]
+            # Rescale whole ROI for spatial features
+            if self._feature_parameters['spatial_size']:
+                spatial_shape = (int(scaled_shape[0] * spatial_scale_y),
+                                 int(scaled_shape[1] * spatial_scale_x))
+                spatial = cv2.resize(scaled_roi, spatial_shape)
             # Calculate bounds for iterating over the HOG feature image
             x_start = 0
             x_stop = hog_shape[1] - x_cells_per_window + 1
@@ -110,20 +116,22 @@ class Detector(object):
                     else:
                         color_features = []
 
+                    # Extract spatial features
+                    if self._feature_parameters['spatial_size']:
+                        spatial_start_x = int(x*pix_per_cell * spatial_scale_x)
+                        spatial_end_x = spatial_start_x + self._feature_parameters['spatial_size'][0]
+                        spatial_start_y = int(y*pix_per_cell * spatial_scale_y)
+                        spatial_end_y = spatial_start_y + self._feature_parameters['spatial_size'][1]
+                        spatial_patch = spatial[spatial_start_y:spatial_end_y, spatial_start_x:spatial_end_x,:]
+                        spatial_features = np.ravel(spatial_patch)
+                    else:
+                        spatial_features = []
                     # Extract hog features
                     hog_features = np.ravel([h[y:y+y_cells_per_window, x:x+x_cells_per_window].ravel() for h in hog])
 
                     # Create window (in unscaled image dimensions)
                     window_start = (roi_x[0] + int(x/scale * pix_per_cell), roi_y[0] + int(y/scale * pix_per_cell))
                     window_end = (int(window_start[0] + self._shape[1]/scale), int(window_start[1] + self._shape[0]/scale))
-                    
-                    # Extract spatial features
-                    # TODO: Resize only once
-                    if self._feature_parameters['spatial_size'] is not None:
-                        spatial_window = img[window_start[1]:window_end[1], window_start[0]:window_end[0],:]
-                        spatial_features = bin_spatial(spatial_window, self._feature_parameters['spatial_size'])
-                    else:
-                        spatial_features = []
 
                     # Vectorize features
                     features = np.concatenate((spatial_features, color_features, hog_features))
@@ -133,8 +141,8 @@ class Detector(object):
                     # Check if the window is a vehicle
                     carness = self._classifier.decision_function(features)
                     if carness > 0.3:
-                        hits.append((window_start, window_end, scale**2))#, carness))
-                    #elif carness < -4:
-                    #    hits.append((window_start, window_end, carness*scale))
-                           
+                        hits.append((window_start, window_end, scale**2))
+            end_time = time.clock()
+            if print_debug:
+                print("Scale {:.2f} found {} hits in {} seconds".format(scale, len(hits) - start_hits, end_time - start_time))
         return hits

@@ -22,7 +22,6 @@ parser.add_argument('vehicle_directory', type=str)
 parser.add_argument('non_vehicle_directory', type=str)
 args = parser.parse_args()
 
-# TODO: Argify these
 feature_parameters = {
     'cspace': 'YCrCb',
     'spatial_size': (32, 32),
@@ -52,10 +51,10 @@ scaler = StandardScaler().fit(X_train)
 X_train = scaler.transform(X_train)
 X_test = scaler.transform(X_test)
 
-
 print("Training...")
 svc = LinearSVC()
 svc.fit(X_train, y_train)
+
 positives = y_test.nonzero()
 negatives = np.logical_not(y_test).nonzero()
 tp = svc.score(X_test[positives], y_test[positives])
@@ -64,7 +63,6 @@ print('True Positive Rate:  {:.2f}%'.format(100*tp))
 print('True Negative Rate:  {:.2f}%'.format(100*tn))
 print('False Positive Rate: {:.2f}%'.format(100*(1-tn)))
 print('False Negative Rate: {:.2f}%'.format(100*(1-tp)))
-
 
 print('Pickling classifier to classifier.p')
 with open('classifier.p', 'wb') as f:
